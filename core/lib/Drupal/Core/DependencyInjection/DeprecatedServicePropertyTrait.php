@@ -9,9 +9,9 @@ trait DeprecatedServicePropertyTrait {
 
   /**
    * Alows to access deprecated/removed properties.
- *
+   *
    * This method must be public.
- */
+   */
   public function __get($name) {
     if (!isset($this->deprecatedProperties)) {
       throw new \LogicException('The deprecatedProperties property must be defined to use this trait.');

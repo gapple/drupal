@@ -6,6 +6,7 @@ use Drupal\Component\Utility\Number;
 use Drupal\Core\Cache\Cache;
 use Drupal\Core\Entity\ContentEntityBase;
 use Drupal\comment\CommentInterface;
+use Drupal\Core\Entity\EditorialContentEntityBase;
 use Drupal\Core\Entity\EntityChangedTrait;
 use Drupal\Core\Entity\EntityPublishedTrait;
 use Drupal\Core\Entity\EntityStorageInterface;
@@ -43,15 +44,23 @@ use Drupal\user\UserInterface;
  *   },
  *   base_table = "comment",
  *   data_table = "comment_field_data",
+ *   revision_table = "comment_revision",
+ *   revision_data_table = "comment_field_revision",
  *   uri_callback = "comment_uri",
  *   translatable = TRUE,
  *   entity_keys = {
  *     "id" = "cid",
+ *     "revision" = "revision_id",
  *     "bundle" = "comment_type",
  *     "label" = "subject",
  *     "langcode" = "langcode",
  *     "uuid" = "uuid",
  *     "published" = "status",
+ *   },
+ *   revision_metadata_keys = {
+ *     "revision_user" = "revision_user",
+ *     "revision_created" = "revision_created",
+ *     "revision_log_message" = "revision_log_message",
  *   },
  *   links = {
  *     "canonical" = "/comment/{comment}",
@@ -67,7 +76,7 @@ use Drupal\user\UserInterface;
  *   }
  * )
  */
-class Comment extends ContentEntityBase implements CommentInterface {
+class Comment extends EditorialContentEntityBase implements CommentInterface {
 
   use EntityChangedTrait;
   use EntityPublishedTrait;
@@ -220,7 +229,6 @@ class Comment extends ContentEntityBase implements CommentInterface {
   public static function baseFieldDefinitions(EntityTypeInterface $entity_type) {
     /** @var \Drupal\Core\Field\BaseFieldDefinition[] $fields */
     $fields = parent::baseFieldDefinitions($entity_type);
-    $fields += static::publishedBaseFieldDefinitions($entity_type);
 
     $fields['cid']->setLabel(t('Comment ID'))
       ->setDescription(t('The comment ID.'));
@@ -248,6 +256,7 @@ class Comment extends ContentEntityBase implements CommentInterface {
     $fields['subject'] = BaseFieldDefinition::create('string')
       ->setLabel(t('Subject'))
       ->setTranslatable(TRUE)
+      ->setRevisionable(TRUE)
       ->setSetting('max_length', 64)
       ->setDisplayOptions('form', [
         'type' => 'string_textfield',
@@ -267,18 +276,21 @@ class Comment extends ContentEntityBase implements CommentInterface {
       ->setLabel(t('Name'))
       ->setDescription(t("The comment author's name."))
       ->setTranslatable(TRUE)
+      ->setRevisionable(TRUE)
       ->setSetting('max_length', 60)
       ->setDefaultValue('');
 
     $fields['mail'] = BaseFieldDefinition::create('email')
       ->setLabel(t('Email'))
       ->setDescription(t("The comment author's email address."))
-      ->setTranslatable(TRUE);
+      ->setTranslatable(TRUE)
+      ->setRevisionable(TRUE);
 
     $fields['homepage'] = BaseFieldDefinition::create('uri')
       ->setLabel(t('Homepage'))
       ->setDescription(t("The comment author's home page address."))
       ->setTranslatable(TRUE)
+      ->setRevisionable(TRUE)
       // URIs are not length limited by RFC 2616, but we can only store 255
       // characters in our comment DB schema.
       ->setSetting('max_length', 255);
@@ -287,18 +299,21 @@ class Comment extends ContentEntityBase implements CommentInterface {
       ->setLabel(t('Hostname'))
       ->setDescription(t("The comment author's hostname."))
       ->setTranslatable(TRUE)
+      ->setRevisionable(TRUE)
       ->setSetting('max_length', 128)
       ->setDefaultValueCallback(static::class . '::getDefaultHostname');
 
     $fields['created'] = BaseFieldDefinition::create('created')
       ->setLabel(t('Created'))
       ->setDescription(t('The time that the comment was created.'))
-      ->setTranslatable(TRUE);
+      ->setTranslatable(TRUE)
+      ->setRevisionable(TRUE);
 
     $fields['changed'] = BaseFieldDefinition::create('changed')
       ->setLabel(t('Changed'))
       ->setDescription(t('The time that the comment was last edited.'))
-      ->setTranslatable(TRUE);
+      ->setTranslatable(TRUE)
+      ->setRevisionable(TRUE);
 
     $fields['thread'] = BaseFieldDefinition::create('string')
       ->setLabel(t('Thread place'))
@@ -316,6 +331,11 @@ class Comment extends ContentEntityBase implements CommentInterface {
       ->setDescription(t('The field name through which this comment was added.'))
       ->setSetting('is_ascii', TRUE)
       ->setSetting('max_length', FieldStorageConfig::NAME_MAX_LENGTH);
+
+    // Hide the revision log message field by default.
+    $fields['revision_log_message']->setDisplayOptions('form', [
+      'type' => 'hidden',
+    ]);
 
     return $fields;
   }
